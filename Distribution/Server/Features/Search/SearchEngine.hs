@@ -179,7 +179,7 @@ insertDoc :: (Ord key, Ix field, Bounded field, Ix feature, Bounded feature) =>
              SearchEngine doc key field feature ->
              SearchEngine doc key field feature
 insertDoc doc se@SearchEngine{ searchConfig = SearchConfig {
-                                 documentKey, 
+                                 documentKey,
                                  extractDocumentTerms,
                                  documentFeatureValue
                                }
@@ -361,24 +361,28 @@ queryExplain se@SearchEngine{ searchIndex,
                           paramResultsetHardLimit
                           docidsets
 
-   in rankExplainResults se termids (DocIdSet.toList unrankedResults)
+   in rankExplainResults se exactMatch termids (DocIdSet.toList unrankedResults)
 
 rankExplainResults :: (Ix field, Bounded field, Ix feature, Bounded feature) =>
-                      SearchEngine doc key field feature -> 
+                      SearchEngine doc key field feature ->
+                      Maybe DocId ->
                       [TermId] ->
-                      [DocId] -> 
-                      [(BM25F.Explanation field feature Term, key)]
-rankExplainResults se@SearchEngine{searchIndex} queryTerms docids =
-    sortBy (flip compare `on` (BM25F.overallScore . fst))
+                      [DocId] ->
+                      (Maybe key, [(BM25F.Explanation field feature Term, key)])
+rankExplainResults se@SearchEngine{searchIndex} exactMatch queryTerms docids =
+   (exactMatchKey,
+   sortBy (flip compare `on` (BM25F.overallScore . fst))
       [ (explainRelevanceScore se queryTerms doctermids docfeatvals, dockey)
       | docid <- docids
-      , let (dockey, doctermids, docfeatvals) = SI.lookupDocId searchIndex docid ]
+      , let (dockey, doctermids, docfeatvals) = SI.lookupDocId searchIndex docid ])
+  where
+    exactMatchKey = (\(dk, _, _) -> dk) . SI.lookupDocId searchIndex <$> exactMatch
 
 explainRelevanceScore :: (Ix field, Bounded field, Ix feature, Bounded feature) =>
                          SearchEngine doc key field feature ->
                          [TermId] ->
                          DocTermIds field ->
-                         DocFeatVals feature -> 
+                         DocFeatVals feature ->
                          BM25F.Explanation field feature Term
 explainRelevanceScore SearchEngine{bm25Context, searchIndex}
                       queryTerms doctermids docfeatvals =
